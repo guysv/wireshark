@@ -168,3 +168,4 @@ vgcore.*
 test/*.log
 *.code-workspace
 __pycache__/
+venv/

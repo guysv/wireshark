@@ -90,6 +90,7 @@ static int ett_rdp_capa_rail;
 
 static int ett_rdp_StandardDate;
 static int ett_rdp_DaylightDate;
+static int ett_rdp_optionFlags;
 static int ett_rdp_clientTimeZone;
 static int ett_rdp_mt_req;
 static int ett_rdp_mt_rsp;
@@ -277,6 +278,28 @@ static int hf_rdp_mt_rsp_hrResponse;
 static int hf_rdp_flagsHi;
 static int hf_rdp_codePage;
 static int hf_rdp_optionFlags;
+static int hf_rdp_optionFlagsMouse;
+static int hf_rdp_optionFlagsDisableCtrlAltDel;
+static int hf_rdp_optionFlagsAutoLogon;
+static int hf_rdp_optionFlagsUnicode;
+static int hf_rdp_optionFlagsMaximizeShell;
+static int hf_rdp_optionFlagsLogonNotify;
+static int hf_rdp_optionFlagsCompression;
+static int hf_rdp_optionFlagsCompressionTypeMask;
+static int hf_rdp_optionFlagsEnableWindowsKey;
+static int hf_rdp_optionFlagsRemoteConsoleAudio;
+static int hf_rdp_optionFlagsForceEncryptedCsPdu;
+static int hf_rdp_optionFlagsRail;
+static int hf_rdp_optionFlagsMouseHasWheel;
+static int hf_rdp_optionFlagsLogonErrors;
+static int hf_rdp_optionFlagsPasswordIsScPin;
+static int hf_rdp_optionFlagsNoAudioPlayback;
+static int hf_rdp_optionFlagsUsingSavedCreds;
+static int hf_rdp_optionFlagsAudioCapture;
+static int hf_rdp_optionFlagsVideoDisable;
+static int hf_rdp_optionFlagsReserved1;
+static int hf_rdp_optionFlagsReserved2;
+static int hf_rdp_optionFlagsHidefRailSupport;
 static int hf_rdp_cbDomain;
 static int hf_rdp_cbUserName;
 static int hf_rdp_cbPassword;
@@ -832,6 +855,34 @@ static const value_string redirectionVersions_vals[] = {
 #define CHANNEL_OPTION_REMOTE_CONTROL_PERSISTENT 0x00100000
 
 
+/*
+ * Flags in the flags field of a TS_INFO_PACKET.
+ * XXX - define more, and show them underneath that field.
+ */
+#define INFO_MOUSE                  0x00000001
+#define INFO_DISABLECTRLALTDEL      0x00000002
+#define INFO_AUTOLOGON              0x00000008
+#define INFO_UNICODE                0x00000010
+#define INFO_MAXIMIZESHELL          0x00000020
+#define INFO_LOGONNOTIFY            0x00000040
+#define INFO_COMPRESSION            0x00000080
+#define INFO_COMPRESSIONMASK        0x00001E00
+#define INFO_ENABLEWINDOWSKEY       0x00000100
+#define INFO_REMOTECONSOLEAUDIO     0x00002000
+#define INFO_FORCE_ENCRYPTED_CS_PDU 0x00004000
+#define INFO_RAIL                   0x00008000
+#define INFO_LOGONERRORS            0x00010000
+#define INFO_MOUSE_HAS_WHEEL        0x00020000
+#define INFO_PASSWORD_IS_SC_PIN     0x00040000
+#define INFO_NOAUDIOPLAYBACK        0x00080000
+#define INFO_USING_SAVED_CREDS      0x00100000
+#define INFO_AUDIOCAPTURE           0x00200000
+#define INFO_VIDEO_DISABLE          0x00400000
+#define INFO_RESERVED1              0x00800000
+#define INFO_RESERVED2              0x01000000
+#define INFO_HIDEF_RAIL_SUPPORTED   0x02000000
+
+
 #define RDP_FI_NONE          0x00
 #define RDP_FI_OPTIONAL      0x01
 #define RDP_FI_STRING        0x02
@@ -855,6 +906,7 @@ typedef struct rdp_field_info_t {
 #define FI_VALUE(_hf_, _len_, _value_) { _hf_, _len_, &_value_, 0, 0, NULL }
 #define FI_VARLEN(_hf, _length_) { _hf_, 0, &_length_, 0, 0, NULL }
 #define FI_SUBTREE(_hf_, _len_, _ett_, _sf_) { _hf_, _len_, NULL, _ett_, RDP_FI_SUBTREE, _sf_ }
+#define FI_SUBTREE_FLAGS(_hf_, _len_, _ett_, __flags__, _sf_) { _hf_, _len_, NULL, _ett_, (RDP_FI_SUBTREE|__flags__), _sf_ }
 #define FI_TERMINATOR {NULL, 0, NULL, 0, 0, NULL}
 
 static const value_string rdp_rdstls_pduTypes_vals[] = {
@@ -1352,12 +1404,6 @@ rdp_udp_conversation_equal_matched(gconstpointer k1, gconstpointer k2)
 			(key1->requestId == key2->requestId) &&
 			memcmp(key1->securityCookie, key2->securityCookie, 16) == 0;
 }
-
-/*
- * Flags in the flags field of a TS_INFO_PACKET.
- * XXX - define more, and show them underneath that field.
- */
-#define INFO_UNICODE  0x00000010
 
 static rdp_conv_info_t *
 rdp_get_conversation_data(packet_info *pinfo)
@@ -2364,9 +2410,34 @@ dissect_rdp_SendData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     FI_TERMINATOR,
   };
 
+  rdp_field_info_t optionFlags_fields[] = {
+    {&hf_rdp_optionFlagsMouse,               4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsDisableCtrlAltDel,   4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsAutoLogon,           4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsUnicode,             4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsMaximizeShell,       4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsLogonNotify,         4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsCompression,         4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsCompressionTypeMask, 4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsEnableWindowsKey,    4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsRemoteConsoleAudio,  4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsForceEncryptedCsPdu, 4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsRail,                4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsMouseHasWheel,       4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsPasswordIsScPin,     4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsNoAudioPlayback,     4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsUsingSavedCreds,     4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsAudioCapture,        4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsVideoDisable,        4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsReserved1,           4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsReserved2,           4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    {&hf_rdp_optionFlagsHidefRailSupport,    4, NULL, 0, RDP_FI_NOINCOFFSET, NULL },
+    FI_TERMINATOR
+  };
+
   rdp_field_info_t ue_fields[] = {
     {&hf_rdp_codePage,           4, NULL, 0, 0, NULL },
-    {&hf_rdp_optionFlags,        4, NULL, 0, RDP_FI_INFO_FLAGS, NULL },
+    FI_SUBTREE_FLAGS(&hf_rdp_optionFlags, 4, ett_rdp_optionFlags, RDP_FI_INFO_FLAGS, optionFlags_fields),
     {&hf_rdp_cbDomain,           2, &cbDomain, 2, 0, NULL },
     {&hf_rdp_cbUserName,         2, &cbUserName, 2, 0, NULL },
     {&hf_rdp_cbPassword,         2, &cbPassword, 2, 0, NULL },
@@ -4308,6 +4379,94 @@ proto_register_rdp(void) {
       { "optionFlags", "rdp.optionFlags",
         FT_UINT32, BASE_HEX, NULL, 0,
         NULL, HFILL }},
+    { &hf_rdp_optionFlagsMouse,
+      { "mouse", "rdp.optionFlags.mouse",
+        FT_UINT32, BASE_HEX, NULL, INFO_MOUSE,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsDisableCtrlAltDel,
+      { "disableCtrlAltDel", "rdp.optionFlags.disableCtrlAltDel",
+        FT_UINT32, BASE_HEX, NULL, INFO_DISABLECTRLALTDEL,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsAutoLogon,
+      { "autoLogon", "rdp.optionFlags.autoLogon",
+        FT_UINT32, BASE_HEX, NULL, INFO_AUTOLOGON,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsUnicode,
+      { "unicode", "rdp.optionFlags.unicode",
+        FT_UINT32, BASE_HEX, NULL, INFO_UNICODE,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsMaximizeShell,
+      { "maximizeShell", "rdp.optionFlags.maximizeShell",
+        FT_UINT32, BASE_HEX, NULL, INFO_MAXIMIZESHELL,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsLogonNotify,
+      { "logonNotify", "rdp.optionFlags.logonNotify",
+        FT_UINT32, BASE_HEX, NULL, INFO_LOGONNOTIFY,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsCompression,
+      { "compression", "rdp.optionFlags.compression",
+        FT_UINT32, BASE_HEX, NULL, INFO_COMPRESSION,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsCompressionTypeMask,
+      { "compressionMask", "rdp.optionFlags.compressionMask",
+        FT_UINT32, BASE_HEX, VALS(rdp_compressionType_vals),
+        INFO_COMPRESSIONMASK, NULL, HFILL }},
+    { &hf_rdp_optionFlagsEnableWindowsKey,
+      { "enableWindowsKey", "rdp.optionFlags.enableWindowsKey",
+        FT_UINT32, BASE_HEX, NULL, INFO_ENABLEWINDOWSKEY,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsRemoteConsoleAudio,
+      { "remoteConsoleAudio", "rdp.optionFlags.remoteConsoleAudio",
+        FT_UINT32, BASE_HEX, NULL, INFO_REMOTECONSOLEAUDIO,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsForceEncryptedCsPdu,
+      { "forceEncryptedCsPdu", "rdp.optionFlags.forceEncryptedCsPdu",
+        FT_UINT32, BASE_HEX, NULL, INFO_FORCE_ENCRYPTED_CS_PDU,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsRail,
+      { "rail", "rdp.optionFlags.rail",
+        FT_UINT32, BASE_HEX, NULL, INFO_RAIL,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsMouseHasWheel,
+      { "logonErrors", "rdp.optionFlags.logonErrors",
+        FT_UINT32, BASE_HEX, NULL, INFO_LOGONERRORS,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsLogonErrors,
+      { "mouseHasWheel", "rdp.optionFlags.mouseHasWheel",
+        FT_UINT32, BASE_HEX, NULL, INFO_MOUSE_HAS_WHEEL,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsPasswordIsScPin,
+      { "passwordIsScPin", "rdp.optionFlags.passwordIsScPin",
+        FT_UINT32, BASE_HEX, NULL, INFO_PASSWORD_IS_SC_PIN,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsNoAudioPlayback,
+      { "noAudioPlayback", "rdp.optionFlags.noAudioPlayback",
+        FT_UINT32, BASE_HEX, NULL, INFO_NOAUDIOPLAYBACK,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsUsingSavedCreds,
+      { "usingSavedCreds", "rdp.optionFlags.usingSavedCreds",
+        FT_UINT32, BASE_HEX, NULL, INFO_USING_SAVED_CREDS,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsAudioCapture,
+      { "audioCapture", "rdp.optionFlags.audioCapture",
+        FT_UINT32, BASE_HEX, NULL, INFO_AUDIOCAPTURE,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsVideoDisable,
+      { "videDisable", "rdp.optionFlags.videDisable",
+        FT_UINT32, BASE_HEX, NULL, INFO_VIDEO_DISABLE,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsReserved1,
+      { "reserved1", "rdp.optionFlags.reserved1",
+        FT_UINT32, BASE_HEX, NULL, INFO_RESERVED1,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsReserved2,
+      { "reserved2", "rdp.optionFlags.reserved2",
+        FT_UINT32, BASE_HEX, NULL, INFO_RESERVED2,
+        NULL, HFILL }},
+    { &hf_rdp_optionFlagsHidefRailSupport,
+      { "hidefRailSupport", "rdp.optionFlags.hidefRailSupport",
+        FT_UINT32, BASE_HEX, NULL, INFO_HIDEF_RAIL_SUPPORTED,
+        NULL, HFILL }},
     { &hf_rdp_cbDomain,
       { "cbDomain", "rdp.domain.length",
         FT_UINT16, BASE_DEC, NULL, 0,
@@ -5179,6 +5338,7 @@ proto_register_rdp(void) {
     &ett_rdp_validClientLicenseData,
     &ett_rdp_StandardDate,
     &ett_rdp_DaylightDate,
+    &ett_rdp_optionFlags,
     &ett_rdp_clientTimeZone,
     &ett_rdp_fastpath,
     &ett_rdp_fastpath_header,
