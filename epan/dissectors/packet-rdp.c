@@ -491,6 +491,7 @@ static int hf_rdp_fastpathServerUpdateCode;
 static int hf_rdp_fastpathServerFragmentation;
 static int hf_rdp_fastpathServerCompression;
 static int hf_rdp_fastpathServerSize;
+static int hf_rdp_fastpathServerData;
 
 static int hf_rdp_fastpathInputHeader;
 static int hf_rdp_fastpathClientNumEvents2;
@@ -3552,6 +3553,7 @@ dissect_rdp_fastpath(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 			  break;
 		  }
 
+      proto_tree_add_item(event_tree, hf_rdp_fastpathServerData, tvb, offset, recordSize, ENC_NA);
 		  offset += recordSize;
 	  }
 
@@ -4840,6 +4842,10 @@ proto_register_rdp(void) {
     { &hf_rdp_fastpathServerSize,
       { "Size", "rdp.fastpath.server.size",
             FT_UINT16, BASE_DEC, NULL, 0x00,
+            NULL, HFILL }},
+    { &hf_rdp_fastpathServerData,
+      { "data", "rdp.fastpath.server.data",
+        FT_BYTES, BASE_NONE, NULL, 0,
             NULL, HFILL }},
     { &hf_rdp_totalLength,
       { "totalLength", "rdp.totalLength",
